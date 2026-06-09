@@ -2,6 +2,9 @@ package br.com.danielfss.api_aws.controller;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import br.com.danielfss.api_aws.util.HealthDTO;
+
 import org.springframework.web.bind.annotation.GetMapping;
 
 
@@ -10,8 +13,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 public class Controller {
     
     @GetMapping("/health")
-    public String health() {
-        return "Up!";
+    public HealthDTO health() {
+        return new HealthDTO("Up!");
     }
 
 }
