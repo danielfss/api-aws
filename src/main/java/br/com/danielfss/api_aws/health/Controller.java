@@ -1,4 +1,4 @@
-package br.com.danielfss.api_aws.controller;
+package br.com.danielfss.api_aws.health;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
