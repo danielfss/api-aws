@@ -2,6 +2,9 @@ package br.com.danielfss.api_aws.rds.service;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import br.com.danielfss.api_aws.rds.dto.RequestUsuarioDTO;
@@ -30,6 +33,11 @@ public class UsuarioService {
 
     public List<UsuarioEntity> findAll() {
         return usuarioRepository.findAll();
+    }
+
+    public Page<UsuarioEntity> findAllPaginated(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return usuarioRepository.findAll(pageable);
     }
 
     public void update(Long id, RequestUsuarioDTO request) {
