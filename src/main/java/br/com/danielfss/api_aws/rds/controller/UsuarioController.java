@@ -29,7 +29,7 @@ public class UsuarioController {
         this.usuarioService = usuarioService;
     }
 
-    @GetMapping("/listar-todos")
+    @GetMapping("/")
     public ResponseEntity<List<UsuarioEntity>> findAll() {
         return ResponseEntity.ok(usuarioService.findAll());
     }
