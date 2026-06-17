@@ -1,6 +1,7 @@
 package br.com.danielfss.api_aws.rds.entity;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
@@ -9,7 +10,9 @@ import jakarta.persistence.Table;
 public class UsuarioEntity {
 
     @Id
+    @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
     private Long id;
+
     private String nome;
     private String email;
 
