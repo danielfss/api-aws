@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 
 
 @RestController
-@RequestMapping("/")
-public class Controller {
+@RequestMapping("/health")
+public class HealthController {
     
     @GetMapping("/health")
     public HealthDTO health() {
