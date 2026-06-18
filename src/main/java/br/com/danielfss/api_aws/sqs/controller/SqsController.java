@@ -22,11 +22,20 @@ public class SqsController {
         this.service = service;
     }
 
+    /**
+     * "API que envia uma mensagem de CEP" — deve retornar o ID do procedimento.
+     * Exemplo: POST /sqs/send?cep=01001000
+     */
     @PostMapping("/send")
-    public ResponseEntity<String> send(@RequestParam String message) {
-        return ResponseEntity.ok(service.sendMessage(message));
+    public ResponseEntity<Map<String, Long>> send(@RequestParam String cep) {
+        Long procedimentoId = service.enviarCep(cep);
+        return ResponseEntity.ok(Map.of("procedimentoId", procedimentoId));
     }
 
+    /**
+     * "API que lê a base de dados" — dispara o processamento manual da fila.
+     * Exemplo: GET /sqs/process
+     */
     @GetMapping("/process")
     public ResponseEntity<List<Map<String, String>>> process() {
         return ResponseEntity.ok(service.receiveAndProcess());
@@ -36,5 +45,4 @@ public class SqsController {
     public ResponseEntity<List<String>> peek() {
         return ResponseEntity.ok(service.peekMessages());
     }
-    
 }

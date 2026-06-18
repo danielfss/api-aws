@@ -6,6 +6,10 @@ import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import br.com.danielfss.api_aws.sqs.dto.CepMensagemDTO;
+import br.com.danielfss.api_aws.sqs.model.Procedimento;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
 import software.amazon.awssdk.services.sqs.model.Message;
@@ -13,65 +17,112 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageResponse;
 
+/**
+ * Camada de integração com o SQS.
+ *
+ * Diferença principal da versão anterior: agora a mensagem enviada
+ * é um JSON estruturado {procedimentoId, cep} em vez de texto puro,
+ * e o "send" retorna o ID do PROCEDIMENTO (regra de negócio), não
+ * o messageId do SQS (que é só um detalhe de infraestrutura).
+ */
 @Service
 public class SqsService {
 
     private final SqsClient sqsClient;
+    private final ProcedimentoService procedimentoService;
+    private final ObjectMapper objectMapper;
 
     private static final String QUEUE_URL =
             "https://sqs.us-east-2.amazonaws.com/746486152349/aula-aws-java-pleno-sqs";
 
-    public SqsService(SqsClient sqsClient) {
+    public SqsService(SqsClient sqsClient,
+                       ProcedimentoService procedimentoService,
+                       ObjectMapper objectMapper) {
         this.sqsClient = sqsClient;
+        this.procedimentoService = procedimentoService;
+        this.objectMapper = objectMapper;
     }
 
-    public String sendMessage(String message) {
+    /**
+     * Fluxo de envio:
+     * 1. Cria o procedimento no banco (status PENDENTE)
+     * 2. Monta o payload JSON {procedimentoId, cep}
+     * 3. Envia pro SQS
+     * 4. Retorna o ID do PROCEDIMENTO pro cliente da API
+     */
+    public Long enviarCep(String cep) {
 
-        SendMessageRequest request = SendMessageRequest.builder()
-                .queueUrl(QUEUE_URL)
-                .messageBody(message)
-                .build();
+        Procedimento procedimento = procedimentoService.criarPendente(cep);
 
-        SendMessageResponse response = sqsClient.sendMessage(request);
+        try {
+            CepMensagemDTO payload = new CepMensagemDTO(procedimento.getId(), cep);
+            String mensagemJson = objectMapper.writeValueAsString(payload);
 
-        return "Mensagem enviada com sucesso. ID: " + response.messageId();
+            SendMessageRequest request = SendMessageRequest.builder()
+                    .queueUrl(QUEUE_URL)
+                    .messageBody(mensagemJson)
+                    .build();
+
+            SendMessageResponse response = sqsClient.sendMessage(request);
+
+            procedimentoService.vincularMensagemSqs(procedimento.getId(), response.messageId());
+
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao enviar mensagem para o SQS", e);
+        }
+
+        // Aqui está o ponto-chave do exercício: devolvemos o ID do
+        // PROCEDIMENTO (nosso ID de negócio), não o messageId do SQS.
+        return procedimento.getId();
     }
 
+    /**
+     * Consome mensagens da fila manualmente (chamado via GET /sqs/process).
+     * Para cada mensagem: desserializa o JSON, processa via ProcedimentoService
+     * (que consulta o ViaCEP e salva no banco), e remove da fila se OK.
+     */
     public List<Map<String, String>> receiveAndProcess() {
 
         ReceiveMessageRequest request = ReceiveMessageRequest.builder()
                 .queueUrl(QUEUE_URL)
                 .maxNumberOfMessages(10)
                 .waitTimeSeconds(2)
-                .visibilityTimeout(30) // 30s para processar antes de a msg reaparecer
+                .visibilityTimeout(30)
                 .build();
 
         List<Message> messages = sqsClient.receiveMessage(request).messages();
 
-        List<Map<String, String>> processed = new ArrayList<>();
+        List<Map<String, String>> processadas = new ArrayList<>();
 
         for (Message message : messages) {
             try {
-                processMessage(message);
+                CepMensagemDTO payload = objectMapper.readValue(
+                        message.body(), CepMensagemDTO.class);
+
+                procedimentoService.processar(payload.getProcedimentoId(), payload.getCep());
+
                 deleteMessage(message.receiptHandle());
 
-                processed.add(Map.of(
+                processadas.add(Map.of(
                         "messageId", message.messageId(),
-                        "body", message.body(),
+                        "procedimentoId", String.valueOf(payload.getProcedimentoId()),
+                        "cep", payload.getCep(),
                         "status", "PROCESSADA E REMOVIDA"
                 ));
 
             } catch (Exception e) {
-                processed.add(Map.of(
+                // Não remove da fila — a mensagem volta após o visibilityTimeout
+                // para uma nova tentativa (igual redelivery em JMS/MDB).
+                processadas.add(Map.of(
                         "messageId", message.messageId(),
                         "body", message.body(),
                         "status", "FALHA - SERÁ REPROCESSADA",
-                        "erro", e.getMessage()
+                        "erro", String.valueOf(e.getMessage())
                 ));
             }
         }
 
-        return processed;
+        return processadas;
     }
 
     public List<String> peekMessages() {
@@ -86,10 +137,6 @@ public class SqsService {
                 .stream()
                 .map(Message::body)
                 .toList();
-    }
-
-    private void processMessage(Message message) {
-        System.out.println("Processando mensagem: " + message.body());
     }
 
     private void deleteMessage(String receiptHandle) {
