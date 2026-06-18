@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import br.com.danielfss.api_aws.sqs.dto.ProcedimentoDTO;
 import br.com.danielfss.api_aws.sqs.model.Procedimento;
 import br.com.danielfss.api_aws.sqs.service.ProcedimentoService;
 
@@ -20,7 +21,16 @@ public class ProcedimentoController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Procedimento> buscarPorId(@PathVariable Long id) {
-        return ResponseEntity.ok(service.buscarPorId(id));
+    public ResponseEntity<ProcedimentoDTO> buscarPorId(@PathVariable Long id) {
+        Procedimento procedimento = this.service.buscarPorId(id);
+        if (procedimento != null) {
+            ProcedimentoDTO dto = new ProcedimentoDTO();
+            dto.setId(procedimento.getId());
+            dto.setCep(procedimento.getCep());
+            dto.setStatus(procedimento.getStatus());
+            return ResponseEntity.ok(dto);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
     }
 }
