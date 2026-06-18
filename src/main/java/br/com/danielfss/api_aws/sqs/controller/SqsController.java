@@ -11,9 +11,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.com.danielfss.api_aws.sqs.service.SqsService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/sqs")
+@Tag(name = "SQS", description = "Endpoints de integração com AWS SQS")
 public class SqsController {
 
     private final SqsService service;
@@ -27,6 +31,8 @@ public class SqsController {
      * Exemplo: POST /sqs/send?cep=01001000
      */
     @PostMapping("/send")
+    @Operation(summary = "Envia CEP para a fila SQS")
+    @ApiResponse(responseCode = "200", description = "CEP enviado com sucesso")
     public ResponseEntity<Map<String, Long>> send(@RequestParam String cep) {
         Long procedimentoId = service.enviarCep(cep);
         return ResponseEntity.ok(Map.of("procedimentoId", procedimentoId));
@@ -37,11 +43,19 @@ public class SqsController {
      * Exemplo: GET /sqs/process
      */
     @GetMapping("/process")
+    @Operation(summary = "Processa mensagens da fila SQS")
+    @ApiResponse(responseCode = "200", description = "Mensagens processadas com sucesso")
     public ResponseEntity<List<Map<String, String>>> process() {
         return ResponseEntity.ok(service.receiveAndProcess());
     }
 
+    /**
+    * "API que lê a base de dados" — apenas lê as mensagens da fila, sem processar.
+    * Exemplo: GET /sqs/peek
+    */
     @GetMapping("/peek")
+    @Operation(summary = "Lê mensagens da fila SQS")
+    @ApiResponse(responseCode = "200", description = "Mensagens lidas com sucesso")
     public ResponseEntity<List<String>> peek() {
         return ResponseEntity.ok(service.peekMessages());
     }
